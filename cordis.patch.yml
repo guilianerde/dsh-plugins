@@ -1,0 +1,8 @@
+# dsh-sidebar-browser-control bundle patch.
+#
+# Mounts the host half of the plugin.  The same package declares `dsh.client`
+# in package.json, so the DSH client module loader picks up lib/client.js in
+# the renderer and serves sidebar-browser requests for the current session.
+- insert:
+    - id: sidebar-browser-control
+      name: 'dsh-sidebar-browser-control'

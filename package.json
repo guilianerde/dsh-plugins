@@ -1,0 +1,33 @@
+{
+  "name": "dsh-sidebar-browser-control",
+  "version": "0.1.0",
+  "description": "Control DSH's built-in sidebar browser from agent tools",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [],
+      "platform": "web",
+      "immediately": true
+    },
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "cordis.patch.yml"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "build:client": "node scripts/build-client.mjs",
+    "test": "node test/host.test.mjs"
+  }
+}
