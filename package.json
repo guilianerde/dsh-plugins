@@ -1,6 +1,6 @@
 {
   "name": "dsh-sidebar-browser-control",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Control DSH's built-in sidebar browser from agent tools",
   "type": "module",
   "main": "lib/index.js",
@@ -29,5 +29,16 @@
   "scripts": {
     "build:client": "node scripts/build-client.mjs",
     "test": "node test/host.test.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "browser-automation",
+    "electron",
+    "plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guilianerde/dsh-sidebar-browser-control.git"
   }
 }

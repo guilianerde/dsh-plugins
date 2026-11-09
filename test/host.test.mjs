@@ -72,6 +72,7 @@ const poller = (async () => {
     const result = await post('poll', { sessionId: session, mode: 'desktop', hasBrowser: true, tabs: [], waitMs: 15_000 })
     if (!result.ok || result.value.request === null) continue
     const request = result.value.request
+    assert.equal(request.sessionId, session)
     const value = request.name === 'tabs'
       ? { text: 'tabs: tab1' }
       : request.name === 'screenshot'
@@ -80,6 +81,25 @@ const poller = (async () => {
     await post('respond', { sessionId: session, requestId: request.id, ok: true, value })
   }
 })()
+
+// A second session's renderer polls independently: the host must route each
+// tool call to its own session and never to whichever poller answered first.
+const sessionB = 'session-other'
+const helloB = await post('hello', { sessionId: sessionB, mode: 'desktop', hasBrowser: true, tabs: [] })
+assert.equal(helloB.ok, true)
+let pollingB = true
+const pollerB = (async () => {
+  while (pollingB) {
+    const result = await post('poll', { sessionId: sessionB, mode: 'desktop', hasBrowser: true, tabs: [], waitMs: 15_000 })
+    if (!result.ok || result.value.request === null) continue
+    const request = result.value.request
+    assert.equal(request.sessionId, sessionB)
+    await post('respond', { sessionId: sessionB, requestId: request.id, ok: true, value: { text: `B:${request.name}` } })
+  }
+})()
+const execB = { agent: { id: sessionB }, signal: new AbortController().signal }
+const tabsB = await tools.get('sidebar_browser_tabs').execute({}, execB)
+assert.equal(tabsB.text, 'B:tabs')
 
 const exec = { agent: { id: session }, signal: new AbortController().signal }
 const tabs = await tools.get('sidebar_browser_tabs').execute({}, exec)
@@ -104,6 +124,18 @@ await assert.rejects(
   () => tools.get('sidebar_browser_tabs').execute({}, { agent: { id: 'other-session' } }),
   /SIDEBAR_UNAVAILABLE/,
 )
+
+// A renderer that stops serving a session says goodbye; its queued work is
+// rejected immediately instead of hanging until the tool timeout.
+pollingB = false
+await post('bye', { sessionId: sessionB })
+await Promise.race([pollerB, new Promise((resolve) => setTimeout(resolve, 500))])
+await assert.rejects(
+  () => tools.get('sidebar_browser_tabs').execute({}, execB),
+  /SIDEBAR_UNAVAILABLE/,
+)
+const tabsAfterBye = await tools.get('sidebar_browser_tabs').execute({}, exec)
+assert.equal(tabsAfterBye.text, 'tabs: tab1')
 
 polling = false
 await Promise.race([poller, new Promise((resolve) => setTimeout(resolve, 100))])
