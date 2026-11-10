@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "title": "Session management",
+    "description": "Adds session delete and message edit-rewind features: edit historical messages and discard all subsequent content to continue the session from the edited point."
+  },
+  "menu.label": "Delete session",
+  "confirm.title": "Delete session permanently?",
+  "confirm.message": "This will permanently delete the session and all its messages from your local storage. This action cannot be undone.",
+  "confirm.ok": "Delete",
+  "confirm.cancel": "Cancel",
+  "delete.success": "Session deleted",
+  "delete.error": "Failed to delete session: ",
+  "edit.menu.label": "Edit & Rewind",
+  "edit.title": "Edit message and rewind session",
+  "edit.description": "Edit the content of this message. After confirmation, all messages after this point will be permanently discarded and the session will continue from this edited message.",
+  "edit.content.label": "New message content:",
+  "edit.confirm": "Confirm & Rewind",
+  "edit.cancel": "Cancel",
+  "edit.success": "Session rewound successfully",
+  "edit.error": "Failed to rewind session: ",
+  "edit.warning": "⚠️ This will discard all messages after this point and cannot be undone."
+}
