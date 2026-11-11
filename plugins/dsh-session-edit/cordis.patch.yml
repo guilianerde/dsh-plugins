@@ -1,0 +1,3 @@
+- insert:
+    - id: session-edit
+      name: '@local/session-edit'
