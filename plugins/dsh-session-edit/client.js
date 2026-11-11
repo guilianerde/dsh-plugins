@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/session-edit',
+  id: 'dsh-session-edit',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
       useCallback, useEffect, useRef, useState,
     } = React;
 
-    const NS = '@local/session-edit';
+    const NS = 'dsh-session-edit';
     const CHANNEL = '/session-edit';
     const ENDPOINT = /^[A-Za-z0-9_$.-]+$/;
 

@@ -1,9 +1,27 @@
 {
-  "name": "@local/session-delete",
+  "name": "dsh-permanent-session-delete",
   "version": "2.1.0",
-  "private": true,
+  "description": "Permanently delete a DSH desktop session and its local message log.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guilianerde/dsh-plugins.git",
+    "directory": "plugins/dsh-session-delete"
+  },
+  "homepage": "https://github.com/guilianerde/dsh-plugins/tree/main/plugins/dsh-session-delete#readme",
+  "bugs": {
+    "url": "https://github.com/guilianerde/dsh-plugins/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "session",
+    "delete"
+  ],
   "type": "module",
   "main": "index.js",
+  "icon": "./icon.svg",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -16,8 +34,22 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md",
+    "LICENSE"
   ],
+  "scripts": {
+    "test": "node --test",
+    "prepack": "npm test"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.2-rc.1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dsh": {
     "manifestVersion": 1,
     "bundle": {

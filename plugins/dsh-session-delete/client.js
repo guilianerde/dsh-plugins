@@ -1,10 +1,10 @@
 window.__ModuleLoader__.load({
-  id: '@local/session-delete',
+  id: 'dsh-permanent-session-delete',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
 
-    const NS = '@local/session-delete';
+    const NS = 'dsh-permanent-session-delete';
     const CHANNEL = '/session-delete';
     const ENDPOINT = /^[A-Za-z0-9_$.-]+$/;
     const DANGER = 'var(--dsw-alias-state-error-primary, #d92d20)';

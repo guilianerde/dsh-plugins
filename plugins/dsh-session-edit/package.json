@@ -1,9 +1,28 @@
 {
-  "name": "@local/session-edit",
+  "name": "dsh-session-edit",
   "version": "1.0.0",
-  "private": true,
+  "description": "Edit an earlier DSH message and resend it from that point in the conversation.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guilianerde/dsh-plugins.git",
+    "directory": "plugins/dsh-session-edit"
+  },
+  "homepage": "https://github.com/guilianerde/dsh-plugins/tree/main/plugins/dsh-session-edit#readme",
+  "bugs": {
+    "url": "https://github.com/guilianerde/dsh-plugins/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "session",
+    "message-edit",
+    "rewind"
+  ],
   "type": "module",
   "main": "index.js",
+  "icon": "./icon.svg",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -17,8 +36,22 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md",
+    "LICENSE"
   ],
+  "scripts": {
+    "test": "node --test",
+    "prepack": "npm test"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.2-rc.1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dsh": {
     "manifestVersion": 1,
     "bundle": {

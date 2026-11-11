@@ -193,7 +193,7 @@ function createContext({
 }
 
 test('exports only the permanent-delete Host capability', () => {
-  assert.equal(name, '@local/session-delete');
+  assert.equal(name, 'dsh-permanent-session-delete');
   assert.deepEqual(inject, [
     'connection',
     'sessionPersistence',

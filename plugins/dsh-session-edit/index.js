@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { currentSurface, editRange } from './surface-edit.js';
 
-export const name = '@local/session-edit';
+export const name = 'dsh-session-edit';
 export const inject = ['connection', 'sessionController', 'sessionQuery', 'webServer'];
 const CHANNEL = '/session-edit';
 const MARKER = 'dsh-session-edit';
