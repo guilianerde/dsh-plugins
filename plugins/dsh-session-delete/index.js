@@ -14,6 +14,7 @@ export const name = 'dsh-permanent-session-delete';
 export const inject = [
   'connection',
   'sessionPersistence',
+  'storageDomain',
   'webServer',
   'sessions',
   'agents',
@@ -24,6 +25,7 @@ const ENDPOINT = /^[A-Za-z0-9_$.-]+$/;
 const LOG_FILENAME = /^session(?:\.v[1-9][0-9]*)?\.jsonl(?:\.zstd)?$/u;
 const PROJECT_DIRECTORY = /^--.+--$/u;
 const MAX_BODY_BYTES = 16 * 1024;
+const PROJECTION_CACHE_DOMAIN = 'session_projcache';
 
 class DeleteError extends Error {
   constructor(code, message) {
@@ -139,18 +141,33 @@ function writeJson(res, status, value) {
 }
 
 export function apply(ctx) {
-  async function statSession(sessionId) {
-    let snapshot;
+  async function readSessionSnapshot(sessionId) {
     try {
-      snapshot = await ctx.sessionPersistence.stat(sessionId);
+      return await ctx.sessionPersistence.stat(sessionId);
     } catch (error) {
       if (error instanceof DeleteError) throw error;
       throw new DeleteError('DELETE_FAILED', 'The session storage could not be inspected.');
     }
-    if (snapshot === undefined) {
-      throw new DeleteError('SESSION_NOT_FOUND', 'The session no longer exists.');
+  }
+
+  async function discardProjectionCache(sessionId) {
+    const domain = ctx.storageDomain?.get?.(PROJECTION_CACHE_DOMAIN);
+    const table = domain?.table?.('sessions');
+    if (typeof table?.delete !== 'function') return;
+
+    try {
+      await table.delete(sessionId);
+    } catch (error) {
+      // The log is authoritative. A stale cache write is harmless, but must not
+      // prevent the sidebar from dropping a session whose log is already gone.
+      ctx.logger?.warn?.('session-delete: failed to discard projection-cache row', error);
     }
-    return snapshot;
+  }
+
+  async function announceRemoval(sessionId) {
+    await discardProjectionCache(sessionId);
+    ctx.emit('api-session/removed', sessionId);
+    return { sessionId, deleted: true };
   }
 
   async function assertSafeFiles(storage) {
@@ -196,8 +213,10 @@ export function apply(ctx) {
 
   async function deleteSession(payload) {
     const sessionId = requireSessionId(payload);
-    const initialSnapshot = await statSession(sessionId);
-    const initialStorage = sessionStorage(sessionId, initialSnapshot);
+    const initialSnapshot = await readSessionSnapshot(sessionId);
+    const initialStorage = initialSnapshot === undefined
+      ? undefined
+      : sessionStorage(sessionId, initialSnapshot);
 
     const session = ctx.sessions.get(sessionId);
     const agent = ctx.agents.get(sessionId);
@@ -205,39 +224,66 @@ export function apply(ctx) {
       throw new DeleteError('UNSAFE_SESSION_PATH', 'The live Agent does not own the requested session.');
     }
 
-    if (agent !== undefined) {
-      agent.cancel({ kind: 'user' });
-      await agent.whenIdle();
-    }
-
-    const liveSession = ctx.sessions.get(sessionId) ?? session;
-    if (liveSession !== undefined) {
-      const flushed = await ctx.sessions.flush(liveSession);
-      if (flushed === false) {
-        throw new DeleteError('DELETE_FAILED', 'The session could not be made durable before deletion.');
+    try {
+      if (agent !== undefined) {
+        agent.cancel({ kind: 'user' });
+        await agent.whenIdle();
       }
+
+      const liveSession = ctx.sessions.get(sessionId) ?? session;
+      if (liveSession !== undefined) {
+        const flushed = await ctx.sessions.flush(liveSession);
+        if (flushed === false) {
+          throw new DeleteError('DELETE_FAILED', 'The session could not be made durable before deletion.');
+        }
+      }
+    } catch (error) {
+      // A resident Session can outlive its deleted log and keep failing on
+      // flush. If no durable snapshot reappears, remove its sidebar residue.
+      let currentSnapshot;
+      try {
+        currentSnapshot = await readSessionSnapshot(sessionId);
+      } catch {
+        currentSnapshot = undefined;
+      }
+      if (currentSnapshot === undefined) {
+        return announceRemoval(sessionId);
+      }
+      throw error;
     }
 
     // Flush can materialize a pending Session or move it to a new generation.
-    const finalSnapshot = await statSession(sessionId);
+    const finalSnapshot = await readSessionSnapshot(sessionId);
+    if (finalSnapshot === undefined) {
+      return announceRemoval(sessionId);
+    }
     const finalStorage = sessionStorage(sessionId, finalSnapshot);
     if (finalStorage === undefined) {
-      throw new DeleteError('SESSION_NOT_FOUND', 'The session has no durable JSONL log.');
+      return announceRemoval(sessionId);
     }
     if (initialStorage !== undefined && initialStorage.logPath !== finalStorage.logPath) {
       throw new DeleteError('UNSAFE_SESSION_PATH', 'The session storage path changed during deletion.');
     }
 
-    await assertSafeFiles(finalStorage);
+    try {
+      await assertSafeFiles(finalStorage);
+    } catch (error) {
+      if (error instanceof DeleteError && error.code === 'SESSION_NOT_FOUND') {
+        return announceRemoval(sessionId);
+      }
+      throw error;
+    }
     try {
       await fs.rm(finalStorage.sessionDirectory, { recursive: true });
     } catch (error) {
+      if (error?.code === 'ENOENT') {
+        return announceRemoval(sessionId);
+      }
       ctx.logger?.warn?.('session-delete: failed to remove the session directory', error);
       throw new DeleteError('DELETE_FAILED', 'The session directory could not be deleted.');
     }
 
-    ctx.emit('api-session/removed', sessionId);
-    return { sessionId, deleted: true };
+    return announceRemoval(sessionId);
   }
 
   async function dispatch(endpoint, payload) {

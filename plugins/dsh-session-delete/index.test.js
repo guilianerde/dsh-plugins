@@ -65,6 +65,7 @@ function createContext({
   withAgent = false,
   flush,
   rejection,
+  cacheDelete,
 } = {}) {
   const routes = new Map();
   const disposers = [];
@@ -75,6 +76,7 @@ function createContext({
     flush: [],
     cancel: [],
     idle: 0,
+    cacheDelete: [],
     emit: [],
     order: [],
   };
@@ -108,6 +110,24 @@ function createContext({
         if (typeof snapshots === 'function') return snapshots(id, calls.stat.length);
         if (Array.isArray(snapshots)) return snapshots[calls.stat.length - 1];
         return snapshots;
+      },
+    },
+    storageDomain: {
+      get(domainName) {
+        assert.equal(domainName, 'session_projcache');
+        return {
+          table(tableName) {
+            assert.equal(tableName, 'sessions');
+            return {
+              async delete(id) {
+                calls.cacheDelete.push(id);
+                return typeof cacheDelete === 'function'
+                  ? cacheDelete(id, calls)
+                  : true;
+              },
+            };
+          },
+        };
       },
     },
     sessions: {
@@ -197,6 +217,7 @@ test('exports only the permanent-delete Host capability', () => {
   assert.deepEqual(inject, [
     'connection',
     'sessionPersistence',
+    'storageDomain',
     'webServer',
     'sessions',
     'agents',
@@ -230,6 +251,7 @@ test('deletes a verified session directory and notifies listeners', async (t) =>
   await assert.rejects(fs.lstat(storage.sessionDirectory), { code: 'ENOENT' });
   assert.equal((await fs.stat(storage.projectDirectory)).isDirectory(), true);
   assert.equal(fake.calls.stat.length, 2);
+  assert.deepEqual(fake.calls.cacheDelete, [sessionId]);
   assert.deepEqual(fake.calls.emit, [['api-session/removed', sessionId]]);
 });
 
@@ -429,7 +451,7 @@ test('does not delete either path when flushing moves the log', async (t) => {
   assert.deepEqual(fake.calls.emit, []);
 });
 
-test('does not delete a directory when its log disappears after flush', async (t) => {
+test('removes the sidebar row when its log disappears after flush', async (t) => {
   const sessionId = 'session-disappearing';
   const storage = await createStorage(t, { sessionId });
   const durable = snapshot(sessionId, storage.logPath);
@@ -446,10 +468,10 @@ test('does not delete a directory when its log disappears after flush', async (t
 
   const result = await fake.post('deleteSession', { sessionId });
 
-  assert.equal(result.ok, false);
-  assert.equal(result.error.code, 'SESSION_NOT_FOUND');
+  assert.equal(result.ok, true);
   assert.equal((await fs.stat(storage.sessionDirectory)).isDirectory(), true);
-  assert.deepEqual(fake.calls.emit, []);
+  assert.deepEqual(fake.calls.cacheDelete, [sessionId]);
+  assert.deepEqual(fake.calls.emit, [['api-session/removed', sessionId]]);
 });
 
 test('does not emit removal when filesystem deletion fails', async (t) => {
@@ -547,13 +569,32 @@ test('turns an oversized request body into a JSON failure envelope', async () =>
   assert.deepEqual(fake.calls.stat, []);
 });
 
-test('reports a session whose persistence row is absent', async () => {
+test('removes a sidebar row whose session log is already absent', async () => {
   const fake = createContext({ snapshots: undefined });
   apply(fake.ctx);
 
   const result = await fake.post('deleteSession', { sessionId: 'session-missing' });
 
-  assert.equal(result.ok, false);
-  assert.equal(result.error.code, 'SESSION_NOT_FOUND');
-  assert.deepEqual(fake.calls.emit, []);
+  assert.deepEqual(result, {
+    status: 200,
+    ok: true,
+    value: { sessionId: 'session-missing', deleted: true },
+  });
+  assert.deepEqual(fake.calls.cacheDelete, ['session-missing']);
+  assert.deepEqual(fake.calls.emit, [['api-session/removed', 'session-missing']]);
+});
+
+test('removes the sidebar row even when the cache row cannot be deleted', async () => {
+  const fake = createContext({
+    snapshots: undefined,
+    async cacheDelete() {
+      throw new Error('cache unavailable');
+    },
+  });
+  apply(fake.ctx);
+
+  const result = await fake.post('deleteSession', { sessionId: 'session-stale' });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(fake.calls.emit, [['api-session/removed', 'session-stale']]);
 });
